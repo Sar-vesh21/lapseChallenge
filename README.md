@@ -1,5 +1,9 @@
 # Backend Tech Test: Social Media Feed API Challenge
 
+
+> **Note:** Hey! To get started, locate the file [Get Started Guide](GetStarted.md)
+
+
 ## Overview
 You are building a new social media application's backend service. At the core of your product is a feed API that powers both web and mobile clients. Your task is to design and implement a high-performance backend service that can efficiently serve social media feed content while meeting strict performance requirements.
 
