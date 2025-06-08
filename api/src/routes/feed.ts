@@ -35,11 +35,8 @@ router.post('/feed/items/:itemId/read', async (req: Request, res: Response) => {
   const { itemId } = req.params;
 
   try {
-    // Update database and cache asynchronously using writeBackCache
-    await writeBackCache(itemId).catch(error => {
-      console.error('Error in writeBackCache:', error);
-    });
-
+    // Update database and cache using writeBackCache
+    await writeBackCache(itemId);
     res.status(200).send();
   } catch (error) {
     console.error('Error marking item as read:', error);
