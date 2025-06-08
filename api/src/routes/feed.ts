@@ -1,5 +1,7 @@
 import { Router } from 'express';
 import redisClient from '../redis/client';
+import driver from '../db/driver';
+import writeBackCache from '../redis/writeBackCache';
 
 interface FeedItem {
     id: string
@@ -25,9 +27,13 @@ router.get('/feed', async (req, res) => {
 //   console.log('Feed request received');
   const limit = parseInt(req.query.limit as string) || 20;
   const cursor = req.query.cursor as string;
+  let redisConnected = false;
 
   try {
-    await redisClient.connect();
+    if (!redisClient.isOpen) {
+        await redisClient.connect();
+        redisConnected = true;
+    }
 
     // Get items from Redis sorted set
     const start = cursor ? parseInt(cursor) : 0;
@@ -69,13 +75,28 @@ router.get('/feed', async (req, res) => {
     console.error('Error fetching feed:', error);
     res.status(500).json({ error: 'Failed to fetch feed' });
   } finally {
-    await redisClient.quit();
+    if (redisConnected) {
+        await redisClient.quit();
+    }
   }
 });
 
 // Mark item as read
 router.post('/feed/items/:itemId/read', async (req, res) => {
-  return res.status(200).send();
+  const { itemId } = req.params;
+
+  try {
+    // Update database and cache asynchronously using writeBackCache
+    await writeBackCache(itemId).catch(error => {
+      console.error('Error in writeBackCache:', error);
+    });
+
+    res.status(200).send();
+
+  } catch (error) {
+    console.error('Error marking item as read:', error);
+    res.status(500).json({ error: 'Failed to mark item as read' });
+  }
 });
 
 export default router; 
