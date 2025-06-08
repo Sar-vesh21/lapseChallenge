@@ -1,19 +1,10 @@
 import { Driver } from "neo4j-driver";
-import * as neo4j from "neo4j-driver";
-import * as schema from "./schema/schema"; 
+import * as schema from "./schema/schema";
+import driver from "./driver";
 
-async function initializeDatabase() {
-    // TODO: FIX THIS
-    const password = process.env.NEO4J_PASSWORD || 'your_password'; // fallback to 'password' if env var not set
-    
-    // Create driver
-    const driver: Driver = neo4j.driver(
-      'bolt://localhost:7687',
-      neo4j.auth.basic('neo4j', password)
-    );
-  
+async function initializeDatabase(driver: Driver) {
+
     try {
-  
       // Initialize schema
       const schemaSession = driver.session();
       try {
@@ -43,6 +34,5 @@ async function initializeDatabase() {
     }
 }
 
-
 // TODO: Add this to docker compose
-initializeDatabase();
+initializeDatabase(driver);
