@@ -1,9 +1,8 @@
 // This file is used to warm the feed cache on startup.
 import { Driver } from 'neo4j-driver';
-import { createClient } from 'redis';
 import driver from '../db/driver';
-
-const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
+import redisClient from './client';
+import { createClient } from 'redis';
 
 interface FeedPost {
   id: string;
@@ -11,10 +10,7 @@ interface FeedPost {
   read: boolean;
 }
 
-export async function warmFeedCache(driver: Driver) {
-  const redisClient = createClient({
-    url: REDIS_URL
-  });
+export async function warmFeedCache(driver: Driver, redisClient: ReturnType<typeof createClient>) {
 
   try {
     await redisClient.connect();
@@ -58,4 +54,4 @@ export async function warmFeedCache(driver: Driver) {
 }
 
 // TODO: Add this to docker compose
-warmFeedCache(driver);
+warmFeedCache(driver, redisClient);
