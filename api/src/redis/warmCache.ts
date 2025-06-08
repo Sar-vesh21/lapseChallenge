@@ -35,8 +35,8 @@ export const warmFeedCache = async (driver: Driver, redisClient: ReturnType<type
       for (const record of feedPosts.records) {
         const { id, timestamp, read } = record.toObject() as FeedPost;
         pipeline.zAdd('feed_posts', {
-          score: timestamp,
-          value: JSON.stringify({ id, read }) // Value is a string
+          score: -timestamp,
+          value: JSON.stringify({ id, read, timestamp }) // Value is a string
         });
       }
 

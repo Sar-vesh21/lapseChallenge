@@ -18,16 +18,59 @@ export interface FeedItem {
     read: boolean;
 }
 
-const writeBackCache = async (feedPost_id: string) => {
+// Helper function to ensure Redis connection
+const ensureRedisConnection = async () => {
+    if (!redisClient.isOpen) {
+        await redisClient.connect();
+    }
+};
+
+export const warmReadFeedCache = async () => {
+    console.log('Warming MORE read feed cache');
     const session = driver.session();
-    let redisConnected = false;
 
     try {
-        // Connect to Redis if not already connected
-        if (!redisClient.isOpen) {
-            await redisClient.connect();
-            redisConnected = true;
+        await ensureRedisConnection();
+
+        // Get the latest timestamp from Redis
+        const latestItems = await redisClient.zRangeWithScores('feed_posts', 0, 0);
+        const latestTimestamp = latestItems[0]?.score || Date.now();
+
+        const feedPosts = await session.run(`
+            MATCH (f:FeedPost)
+            WHERE f.id STARTS WITH 'feed_post_' AND f.read = true
+            WITH f
+            ORDER BY f.timestamp DESC
+            RETURN f.id as id, f.timestamp as timestamp, f.read as read
+            LIMIT 100
+        `, { latestTimestamp });
+
+        // Add new posts to Redis
+        const pipeline = redisClient.multi();
+        for (const record of feedPosts.records) {
+            const { id, timestamp, read } = record.toObject();
+            pipeline.zAdd('feed_posts', {
+                score: 0,
+                value: JSON.stringify({ id, read, timestamp })
+            });
+            pipeline.expire('feed_posts', 60); // Add a TTL for these ones 
         }
+
+        await pipeline.exec();
+        console.log(`Successfully warmed cache with ${feedPosts.records.length} new feed posts`);
+    } catch (error) {
+        console.error('Error warming more feed posts:', error);
+        throw error;
+    } finally {
+        await session.close();
+    }
+};
+
+const writeBackCache = async (feedPost_id: string) => {
+    const session = driver.session();
+
+    try {
+        await ensureRedisConnection();
 
         // Remove the item from Redis by its value
         const value = JSON.stringify({ id: feedPost_id });
@@ -57,22 +100,22 @@ const writeBackCache = async (feedPost_id: string) => {
     } catch (error) {
         console.error('Error in writeBackCache:', error);
         throw error;
-    } finally {
-        // Only disconnect Redis if we connected it in this function
-        if (redisConnected) {
-            await redisClient.quit();
-        }
     }
 }
 
 const getFeedPosts = async (start: number, end: number) => {
-    let redisConnected = false;
-
     try {
-        // Connect to Redis if not already connected
-        if (!redisClient.isOpen) {
-            await redisClient.connect();
-            redisConnected = true;
+        await ensureRedisConnection();
+
+        // Get total count of items
+        const totalItems = await redisClient.zCard('feed_posts');
+        
+        // If we're within 20% of the end, trigger async cache warming
+        if (end > totalItems * 0.8) {
+            console.log('Warming more read feed cache');
+            warmReadFeedCache().catch(error => {
+                console.error('Error in background cache warming:', error);
+            });
         }
 
         const items = await redisClient.zRangeWithScores('feed_posts', start, end);
@@ -94,7 +137,7 @@ const getFeedPosts = async (start: number, end: number) => {
                     type: value.target?.type || 'post',
                     preview_url: value.target?.preview_url || 'https://via.placeholder.com/150'
                 },
-                created_at: new Date(item.score).toISOString(),
+                created_at: new Date(value.timestamp).toISOString(),
                 read: value.read
             });
         }
@@ -103,10 +146,6 @@ const getFeedPosts = async (start: number, end: number) => {
     } catch (error) {
         console.error('Error fetching feed posts:', error);
         throw error;
-    } finally {
-        if (redisConnected) {
-            await redisClient.quit();
-        }
     }
 }
 
