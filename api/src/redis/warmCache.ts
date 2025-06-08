@@ -21,7 +21,7 @@ export const warmFeedCache = async (driver: Driver, redisClient: ReturnType<type
     try {
       const feedPosts = await session.run<FeedPost>(`
         MATCH (f:FeedPost)
-        WHERE f.id STARTS WITH 'feed_post_'
+        WHERE f.id STARTS WITH 'feed_post_' AND f.read = false
         WITH f
         ORDER BY f.timestamp DESC
         RETURN f.id as id, f.timestamp as timestamp, f.read as read
