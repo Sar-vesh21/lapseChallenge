@@ -162,13 +162,13 @@ const getFeedPosts = async (start: number, end: number) => {
                 type: value.type,
                 actor: {
                     id: value.actor?.id || '1',
-                    username: value.actor?.username || 'John Doe',
-                    avatar_url: value.actor?.avatar_url || 'https://via.placeholder.com/150'
+                    username: value.actor?.username || `User${Math.floor(Math.random() * 1000)}`,
+                    avatar_url: value.actor?.avatar_url || `https://randomuser.me/api/portraits/lego/${Math.floor(Math.random() * 8)}.jpg`
                 },
                 target: {
                     id: value.target?.id || '1',
                     type: value.target?.type || 'post',
-                    preview_url: value.target?.preview_url || 'https://via.placeholder.com/150'
+                    preview_url: value.target?.preview_url || `https://randomuser.me/api/portraits/lego/${Math.floor(Math.random() * 8)}.jpg`
                 },
                 created_at: new Date(value.timestamp).toISOString(),
                 read: value.read

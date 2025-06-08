@@ -15,6 +15,18 @@ CREATE INDEX comment_timestamp IF NOT EXISTS FOR (c:Comment) ON (c.timestamp);
 MATCH (c:Comment)-[:ON]->(m)
 MATCH (m:Media)-[:HAS_FEED_POST]->(f)
 MATCH (u:User)-[:SHARED]->(m)
-CREATE (u)-[:WROTE {
-    timestamp: c.timestamp
-}]->(c); 
+
+// Create User-Media Relationships (user creates media)
+MATCH (u:User), (m:Media)
+WHERE u.id = m.created_by
+CREATE (u)-[:CREATED]->(m);
+
+// Create User-Comment Relationships (user creates comment)
+MATCH (u:User), (c:Comment)
+WHERE u.id = c.created_by
+CREATE (u)-[:CREATED]->(c);
+
+// Create Comment-FeedPost Relationships (comment on feed post)
+MATCH (c:Comment), (f:FeedPost)
+WHERE c.feed_post_id = f.id
+CREATE (c)-[:ON]->(f);
