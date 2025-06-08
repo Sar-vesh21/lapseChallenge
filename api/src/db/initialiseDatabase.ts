@@ -1,6 +1,7 @@
 import { Driver } from "neo4j-driver";
 import * as schema from "./schema/schema";
 import driver from "./driver";
+import logger from "../utils/logger";
 
 const initializeDatabase = async (driver: Driver) => {
 
@@ -9,7 +10,9 @@ const initializeDatabase = async (driver: Driver) => {
       const schemaSession = driver.session();
       try {
         await schemaSession.executeWrite(async tx => {
+          logger.info('Creating constraints');
           await schema.createConstraints(tx);
+          logger.info('Creating indexes');
           await schema.createIndexes(tx);
         });
       } finally {
@@ -21,13 +24,15 @@ const initializeDatabase = async (driver: Driver) => {
       try {
         await dataSession.executeWrite(async tx => {
           await schema.loadObjects(tx);
+          logger.info('Loaded objects');
           await schema.loadEdges(tx);
+          logger.info('Loaded edges');
         });
       } finally {
         await dataSession.close();
       }
     } catch (error) {
-      console.error('Failed to initialize database:', error);
+      logger.error('Failed to initialize database:', error);
       throw error;
     } finally {
       await driver.close();
@@ -36,10 +41,10 @@ const initializeDatabase = async (driver: Driver) => {
 
 initializeDatabase(driver)
   .then(() => {
-    console.log('Database initialization completed successfully');
+    logger.info('Database initialization completed successfully');
     process.exit(0);
   })
   .catch((error) => {
-    console.error('Database initialization failed:', error);
+    logger.error('Database initialization failed:', error);
     process.exit(1);
   });

@@ -1,6 +1,7 @@
 import { ManagedTransaction } from 'neo4j-driver';
 import * as fs from 'fs';
 import * as path from 'path';
+import logger from '../../utils/logger';
 
 export const createConstraints = async (txc: ManagedTransaction) => {
   const constraints = [
@@ -44,7 +45,7 @@ export const loadObjects = async (txc: ManagedTransaction) => {
   for (const record of records) {
     i++;
     if (i % 1000 === 0) {
-      console.log(`Loaded ${i} objects`);
+      logger.info(`Loaded ${i} objects`);
     }
     // Convert feed_post to FeedPost for the label
     const label = record.type === 'feed_post' ? 'FeedPost' : 
@@ -97,7 +98,7 @@ export const loadEdges = async (txc: ManagedTransaction) => {
   for (const record of records) {
     i++;
     if (i % 1000 === 0) {
-      console.log(`Loaded ${i} edges`);
+      logger.info(`Loaded ${i} edges`);
     }
 
     switch (record.type) {

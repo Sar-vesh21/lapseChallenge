@@ -1,5 +1,6 @@
 import driver from '../db/driver';
 import redisClient from './client';
+import logger from '../utils/logger';
 
 export interface FeedItem {
     id: string;
@@ -21,12 +22,14 @@ export interface FeedItem {
 // Helper function to ensure Redis connection
 const ensureRedisConnection = async () => {
     if (!redisClient.isOpen) {
+        logger.debug('Redis connection not open, attempting to connect');
         await redisClient.connect();
+        logger.debug('Redis connection established');
     }
 };
 
 export const warmReadFeedCache = async () => {
-    console.log('Warming MORE read feed cache');
+    logger.info('Starting feed cache warm-up');
     const session = driver.session();
 
     try {
@@ -35,6 +38,7 @@ export const warmReadFeedCache = async () => {
         // Get the latest timestamp from Redis
         const latestItems = await redisClient.zRangeWithScores('feed_posts', 0, 0);
         const latestTimestamp = latestItems[0]?.score || Date.now();
+        logger.debug('Retrieved latest timestamp from Redis', { latestTimestamp });
 
         const feedPosts = await session.run(`
             MATCH (f:FeedPost)
@@ -57,9 +61,15 @@ export const warmReadFeedCache = async () => {
         }
 
         await pipeline.exec();
-        console.log(`Successfully warmed cache with ${feedPosts.records.length} new feed posts`);
+        logger.info('Cache warm-up completed', { 
+            postsAdded: feedPosts.records.length,
+            cacheKey: 'feed_posts'
+        });
     } catch (error) {
-        console.error('Error warming more feed posts:', error);
+        logger.error('Error during cache warm-up:', {
+            error: error instanceof Error ? error.message : 'Unknown error',
+            stack: error instanceof Error ? error.stack : undefined
+        });
         throw error;
     } finally {
         await session.close();
@@ -67,6 +77,7 @@ export const warmReadFeedCache = async () => {
 };
 
 const writeBackCache = async (feedPost_id: string) => {
+    logger.debug('Starting write-back cache operation', { feedPost_id });
     const session = driver.session();
 
     try {
@@ -75,6 +86,7 @@ const writeBackCache = async (feedPost_id: string) => {
         // Remove the item from Redis by its value
         const value = JSON.stringify({ id: feedPost_id });
         await redisClient.zRem('feed_posts', value);
+        logger.debug('Removed item from Redis cache', { feedPost_id });
 
         // ASYNC Update the feed post as read in the database
         session.run(`
@@ -84,41 +96,62 @@ const writeBackCache = async (feedPost_id: string) => {
         `, { feedPost_id })
         .then(result => {
             if (result.records.length === 0) {
-                console.error(`Feed post ${feedPost_id} not found in database`);
+                logger.warn('Feed post not found in database', { feedPost_id });
             } else {
-                console.log(`Successfully marked feed post ${feedPost_id} as read in database`);
+                logger.info('Successfully marked feed post as read in database', { feedPost_id });
             }
         })
         .catch(error => {
-            console.error('Error updating database:', error);
+            logger.error('Error updating database:', {
+                feedPost_id,
+                error: error instanceof Error ? error.message : 'Unknown error',
+                stack: error instanceof Error ? error.stack : undefined
+            });
         })
         .finally(() => {
             session.close();
         });
 
-        console.log(`Successfully removed feed post ${feedPost_id} from cache`);
+        logger.info('Write-back cache operation completed', { feedPost_id });
     } catch (error) {
-        console.error('Error in writeBackCache:', error);
+        logger.error('Error in write-back cache operation:', {
+            feedPost_id,
+            error: error instanceof Error ? error.message : 'Unknown error',
+            stack: error instanceof Error ? error.stack : undefined
+        });
         throw error;
     }
 }
 
 const getFeedPosts = async (start: number, end: number) => {
+    logger.debug('Fetching feed posts', { start, end });
     try {
         await ensureRedisConnection();
 
         // Get total count of items
         const totalItems = await redisClient.zCard('feed_posts');
+        logger.debug('Retrieved total items count', { totalItems });
         
         // If we're within 20% of the end, trigger async cache warming
         if (end > totalItems * 0.8) {
-            console.log('Warming more read feed cache');
+            logger.info('Triggering background cache warm-up', { 
+                currentEnd: end,
+                totalItems,
+                threshold: totalItems * 0.8
+            });
             warmReadFeedCache().catch(error => {
-                console.error('Error in background cache warming:', error);
+                logger.error('Background cache warm-up failed:', {
+                    error: error instanceof Error ? error.message : 'Unknown error',
+                    stack: error instanceof Error ? error.stack : undefined
+                });
             });
         }
 
         const items = await redisClient.zRangeWithScores('feed_posts', start, end);
+        logger.debug('Retrieved items from Redis', { 
+            itemsCount: items.length,
+            range: `${start}-${end}`
+        });
 
         // Transform Redis response into required format
         const feedItems: FeedItem[] = [];
@@ -142,9 +175,18 @@ const getFeedPosts = async (start: number, end: number) => {
             });
         }
 
+        logger.info('Successfully retrieved and transformed feed posts', { 
+            count: feedItems.length,
+            range: `${start}-${end}`
+        });
         return feedItems;
     } catch (error) {
-        console.error('Error fetching feed posts:', error);
+        logger.error('Error fetching feed posts:', {
+            start,
+            end,
+            error: error instanceof Error ? error.message : 'Unknown error',
+            stack: error instanceof Error ? error.stack : undefined
+        });
         throw error;
     }
 }

@@ -3,6 +3,7 @@ import { Driver } from 'neo4j-driver';
 import driver from '../db/driver';
 import redisClient from './client';
 import { createClient } from 'redis';
+import logger from '../utils/logger';
 
 interface FeedPost {
   id: string;
@@ -41,12 +42,12 @@ export const warmFeedCache = async (driver: Driver, redisClient: ReturnType<type
       }
 
       await pipeline.exec();
-      console.log(`Successfully cached ${feedPosts.records.length} feed posts in Redis`);
+      logger.info(`Successfully cached ${feedPosts.records.length} feed posts in Redis`);
     } finally {
       await session.close();
     }
   } catch (error) {
-    console.error('Error warming feed cache:', error);
+    logger.error('Error warming feed cache:', error);
     throw error;
   } finally {
     await redisClient.quit();
@@ -55,10 +56,10 @@ export const warmFeedCache = async (driver: Driver, redisClient: ReturnType<type
 
 warmFeedCache(driver, redisClient)
   .then(() => {
-    console.log('Cache warming completed successfully');
+    logger.info('Cache warming completed successfully');
     process.exit(0);  
   })
   .catch((error) => {
-    console.error('Cache warming failed:', error);
+    logger.error('Cache warming failed:', error);
     process.exit(1);
   });
