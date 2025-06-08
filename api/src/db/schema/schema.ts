@@ -2,6 +2,32 @@ import { ManagedTransaction } from 'neo4j-driver';
 import * as fs from 'fs';
 import * as path from 'path';
 
+export const createConstraints = async (txc: ManagedTransaction) => {
+  const constraints = [
+    'CREATE CONSTRAINT user_id IF NOT EXISTS FOR (u:User) REQUIRE u.id IS UNIQUE',
+    'CREATE CONSTRAINT media_id IF NOT EXISTS FOR (m:Media) REQUIRE m.id IS UNIQUE',
+    'CREATE CONSTRAINT feed_post_id IF NOT EXISTS FOR (f:FeedPost) REQUIRE f.id IS UNIQUE', // I need some enterprise version to make sure properties are not null
+    'CREATE CONSTRAINT comment_id IF NOT EXISTS FOR (c:Comment) REQUIRE c.id IS UNIQUE'
+  ];
+
+  for (const constraint of constraints) {
+    await txc.run(constraint);
+  }
+};
+
+export const createIndexes = async (txc: ManagedTransaction) => {
+  const indexes = [
+    'CREATE INDEX user_timestamp IF NOT EXISTS FOR (u:User) ON (u.timestamp)',
+    'CREATE INDEX media_timestamp IF NOT EXISTS FOR (m:Media) ON (m.timestamp)',
+    'CREATE INDEX feed_post_timestamp IF NOT EXISTS FOR (f:FeedPost) ON (f.timestamp)',
+    'CREATE INDEX comment_timestamp IF NOT EXISTS FOR (c:Comment) ON (c.timestamp)'
+  ];
+
+  for (const index of indexes) {
+    await txc.run(index);
+  }
+};
+
 export const loadObjects = async (txc: ManagedTransaction) => {
   const filePath = path.join(__dirname, '../../../data/objects.csv');
   const records = fs.readFileSync(filePath, 'utf8')
@@ -28,9 +54,21 @@ export const loadObjects = async (txc: ManagedTransaction) => {
       await txc.run(`
         MERGE (n:${label} {id: $id})
         ON CREATE SET n.timestamp = $timestamp, n.read = false
+        ON MATCH SET n.read = COALESCE(n.read, false)
       `, {
         id: record.id,
         timestamp: record.timestamp
+      });
+
+      await txc.run(`
+        MATCH (f:FeedPost {id: $id})
+        MATCH (m:Media {id: $mediaId})
+        CREATE (m)-[:HAS_FEED_POST {
+          timestamp: f.timestamp
+        }]->(f)
+      `, {
+        id: record.id,
+        mediaId: record.id.split('_')[2]
       });
     } else {
       await txc.run(`
@@ -93,31 +131,5 @@ export const loadEdges = async (txc: ManagedTransaction) => {
         `, record);
         break;
     }
-  }
-};
-
-export const createConstraints = async (txc: ManagedTransaction) => {
-  const constraints = [
-    'CREATE CONSTRAINT user_id IF NOT EXISTS FOR (u:User) REQUIRE u.id IS UNIQUE',
-    'CREATE CONSTRAINT media_id IF NOT EXISTS FOR (m:Media) REQUIRE m.id IS UNIQUE',
-    'CREATE CONSTRAINT feed_post_id IF NOT EXISTS FOR (f:FeedPost) REQUIRE f.id IS UNIQUE', // I need some enterprise version to make sure properties are not null
-    'CREATE CONSTRAINT comment_id IF NOT EXISTS FOR (c:Comment) REQUIRE c.id IS UNIQUE'
-  ];
-
-  for (const constraint of constraints) {
-    await txc.run(constraint);
-  }
-};
-
-export const createIndexes = async (txc: ManagedTransaction) => {
-  const indexes = [
-    'CREATE INDEX user_timestamp IF NOT EXISTS FOR (u:User) ON (u.timestamp)',
-    'CREATE INDEX media_timestamp IF NOT EXISTS FOR (m:Media) ON (m.timestamp)',
-    'CREATE INDEX feed_post_timestamp IF NOT EXISTS FOR (f:FeedPost) ON (f.timestamp)',
-    'CREATE INDEX comment_timestamp IF NOT EXISTS FOR (c:Comment) ON (c.timestamp)'
-  ];
-
-  for (const index of indexes) {
-    await txc.run(index);
   }
 };
