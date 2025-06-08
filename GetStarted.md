@@ -13,6 +13,13 @@ Before you begin, ensure you have the following installed on your system:
 
 ## Setup Instructions
 
+1. **Install npm packages**
+
+   cd into both the `web` and `api` directories:
+   ```bash
+   npm install
+   ```
+
 1. **Start the Docker Services**
    ```bash
    docker compose up
