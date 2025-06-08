@@ -2,7 +2,7 @@ import { Driver } from "neo4j-driver";
 import * as schema from "./schema/schema";
 import driver from "./driver";
 
-async function initializeDatabase(driver: Driver) {
+const initializeDatabase = async (driver: Driver) => {
 
     try {
       // Initialize schema
@@ -34,5 +34,12 @@ async function initializeDatabase(driver: Driver) {
     }
 }
 
-// TODO: Add this to docker compose
-initializeDatabase(driver);
+initializeDatabase(driver)
+  .then(() => {
+    console.log('Database initialization completed successfully');
+    process.exit(0);
+  })
+  .catch((error) => {
+    console.error('Database initialization failed:', error);
+    process.exit(1);
+  });

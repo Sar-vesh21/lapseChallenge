@@ -5,8 +5,9 @@
   "scripts": {
     "start": "node dist/index.js",
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
-    "init-db": "ts-node-dev --respawn --transpile-only src/db/initialiseDatabase.ts",
-    "warm-cache": "ts-node-dev --respawn --transpile-only src/redis/warmCache.ts",
+    "init-db": "ts-node-dev --transpile-only src/db/initialiseDatabase.ts",
+    "warm-cache": "ts-node-dev --transpile-only src/redis/warmCache.ts",
+    "setup": "npm run init-db && npm run warm-cache",
     "build": "tsc",
     "test": "echo \"Error: no test specified\" && exit 1"
   },

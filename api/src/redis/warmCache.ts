@@ -10,7 +10,7 @@ interface FeedPost {
   read: boolean;
 }
 
-export async function warmFeedCache(driver: Driver, redisClient: ReturnType<typeof createClient>) {
+export const warmFeedCache = async (driver: Driver, redisClient: ReturnType<typeof createClient>) => {
 
   try {
     await redisClient.connect();
@@ -53,5 +53,12 @@ export async function warmFeedCache(driver: Driver, redisClient: ReturnType<type
   }
 }
 
-// TODO: Add this to docker compose
-warmFeedCache(driver, redisClient);
+warmFeedCache(driver, redisClient)
+  .then(() => {
+    console.log('Cache warming completed successfully');
+    process.exit(0);  
+  })
+  .catch((error) => {
+    console.error('Cache warming failed:', error);
+    process.exit(1);
+  });
